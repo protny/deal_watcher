@@ -1,0 +1,19 @@
+# Web scraping
+requests==2.31.0
+beautifulsoup4==4.12.2
+lxml==4.9.3
+
+# Database
+psycopg2-binary==2.9.9
+SQLAlchemy==2.0.23
+
+# Utilities
+python-dotenv==1.0.0
+python-json-logger==2.0.7
+
+# Date/Time
+python-dateutil==2.8.2
+
+# Testing (optional, for development)
+pytest==7.4.3
+pytest-cov==4.1.0

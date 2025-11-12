@@ -1,0 +1,77 @@
+{
+  "scrapers": [
+    {
+      "name": "BMW E-Series Manual",
+      "enabled": true,
+      "category_id": 1,
+      "url": "https://auto.bazos.sk/bmw/",
+      "type": "auto",
+      "max_pages": 10,
+      "filters": {
+        "keywords_any": ["E36", "E46", "E39"],
+        "keywords_all": ["benzin", "manuál"],
+        "keywords_engine": ["6 valec", "6-valec", "6 cylinder", "šesťvalec"],
+        "keywords_excluded": ["havarovan", "automat", "automatická"],
+        "price_max": null,
+        "price_min": null
+      }
+    },
+    {
+      "name": "Large Land Plots",
+      "enabled": true,
+      "category_id": 2,
+      "url": "https://reality.bazos.sk/predam/pozemok/",
+      "type": "reality",
+      "max_pages": 20,
+      "filters": {
+        "price_max": 400000,
+        "area_min": 40000,
+        "area_units": ["m2", "m²", "metrov", "hektár", "ha"],
+        "keywords_excluded": ["stavebný pozemok", "stavebny pozemok"]
+      }
+    },
+    {
+      "name": "Large Houses",
+      "enabled": true,
+      "category_id": 3,
+      "url": "https://reality.bazos.sk/predam/dom/",
+      "type": "reality",
+      "max_pages": 20,
+      "filters": {
+        "price_max": 400000,
+        "area_min": 40000,
+        "area_units": ["m2", "m²", "metrov", "hektár", "ha"],
+        "keywords_excluded": []
+      }
+    },
+    {
+      "name": "Large Cottages",
+      "enabled": true,
+      "category_id": 4,
+      "url": "https://reality.bazos.sk/predam/chata/",
+      "type": "reality",
+      "max_pages": 20,
+      "filters": {
+        "price_max": 400000,
+        "area_min": 40000,
+        "area_units": ["m2", "m²", "metrov", "hektár", "ha"],
+        "keywords_excluded": []
+      }
+    }
+  ],
+  "scraping": {
+    "request_delay_seconds": 2.5,
+    "timeout_seconds": 30,
+    "max_retries": 3,
+    "retry_backoff_factor": 2,
+    "user_agents": [
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0"
+    ]
+  },
+  "database": {
+    "connection_string": "${DB_CONNECTION_STRING}"
+  }
+}
