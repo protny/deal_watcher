@@ -15,3 +15,5 @@ more human readable format will be done later in a consuming web application, th
 
 please research the format of data on the websites
 suggest mechanism for obtaining the data, how to store it, what the filtering system should be
+
+prepare concise document for review before creating a todo list
