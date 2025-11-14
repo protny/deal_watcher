@@ -155,6 +155,17 @@ class BazosScraper(BaseScraper):
             if img_tag and img_tag.get('src'):
                 image_url = urljoin(self.base_url, img_tag.get('src'))
 
+            # Extract posted date from listing (format: [14.11. 2025])
+            posted_date = None
+            date_pattern = re.compile(r'\[(\d{2}\.\d{2}\.\s*\d{4})\]')
+            date_match = listing_div.find(string=date_pattern)
+            if date_match:
+                date_str = date_pattern.search(str(date_match)).group(1)
+                try:
+                    posted_date = datetime.strptime(date_str.strip(), '%d.%m. %Y')
+                except ValueError:
+                    pass
+
             return {
                 'external_id': listing_id,
                 'title': title,
@@ -164,7 +175,8 @@ class BazosScraper(BaseScraper):
                 'postal_code': postal_code,
                 'view_count': view_count,
                 'description': description,
-                'image_url': image_url
+                'image_url': image_url,
+                'posted_date': posted_date
             }
 
         except Exception as e:
@@ -179,10 +191,16 @@ class BazosScraper(BaseScraper):
             price_text: Price text (e.g., "12 500 €", "Dohodou")
 
         Returns:
-            Price as float or None
+            Price as float or None (returns None for "per m²" prices)
         """
         # Handle special cases
-        if not price_text or price_text.lower() in ['dohodou', 'v texte']:
+        if not price_text or price_text.lower() in ['dohodou', 'v texte', 'v text']:
+            return None
+
+        # Reject "price per m²" listings
+        price_lower = price_text.lower()
+        if any(per_unit in price_lower for per_unit in ['/m²', '/m2', '€/m', 'eur/m', 'za m²', 'za m2']):
+            logger.debug(f"Rejecting price-per-m² listing: {price_text}")
             return None
 
         # Remove spaces, non-numeric characters except digits and decimal point
@@ -191,7 +209,12 @@ class BazosScraper(BaseScraper):
         cleaned = cleaned.replace(',', '.')
 
         try:
-            return float(cleaned)
+            price = float(cleaned)
+            # Sanity check - if price is suspiciously low (< 100 EUR), might be per m²
+            if price < 100:
+                logger.debug(f"Suspiciously low price ({price}), might be per m²: {price_text}")
+                return None
+            return price
         except ValueError:
             return None
 
