@@ -34,7 +34,7 @@ class AutoFilter(BaseFilter):
 
         Args:
             listing: Listing data
-            detailed: Whether this is detailed data
+            detailed: Whether this is detailed data (full description available)
 
         Returns:
             True if listing matches all criteria
@@ -43,6 +43,30 @@ class AutoFilter(BaseFilter):
         description = listing.get('description', '')
         combined_text = f"{title} {description}"
 
+        # QUICK FILTER (detailed=False): Only check title and price
+        # This is lenient because list page has truncated descriptions
+        if not detailed:
+            # Only check if model is mentioned in TITLE (very likely to be there)
+            if self.keywords_any:
+                if not self._text_contains_any(title, self.keywords_any):
+                    logger.debug(f"Listing {listing.get('external_id')} quick-rejected: no model in title")
+                    return False
+
+            # Check price range if specified
+            price = listing.get('price')
+            if price is not None:
+                if self.price_min is not None and price < self.price_min:
+                    logger.debug(f"Listing {listing.get('external_id')} quick-rejected: price too low")
+                    return False
+                if self.price_max is not None and price > self.price_max:
+                    logger.debug(f"Listing {listing.get('external_id')} quick-rejected: price too high")
+                    return False
+
+            # Pass quick filter - fetch detail page
+            logger.debug(f"Listing {listing.get('external_id')} passed quick filter")
+            return True
+
+        # FULL FILTER (detailed=True): Check everything in full description
         # Check if any model keyword matches (E36, E46, E39)
         if self.keywords_any:
             if not self._text_contains_any(combined_text, self.keywords_any):

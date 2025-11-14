@@ -34,7 +34,7 @@ class RealityFilter(BaseFilter):
 
         Args:
             listing: Listing data
-            detailed: Whether this is detailed data
+            detailed: Whether this is detailed data (full description available)
 
         Returns:
             True if listing matches all criteria
@@ -43,6 +43,25 @@ class RealityFilter(BaseFilter):
         description = listing.get('description', '')
         combined_text = f"{title} {description}"
 
+        # QUICK FILTER (detailed=False): Only check price
+        # Don't try to extract area from truncated description - it's often missing
+        if not detailed:
+            # Check price range (this IS reliably on list page)
+            price = listing.get('price')
+            if price is not None:
+                if self.price_min is not None and price < self.price_min:
+                    logger.debug(f"Listing {listing.get('external_id')} quick-rejected: price too low")
+                    return False
+
+                if self.price_max is not None and price > self.price_max:
+                    logger.debug(f"Listing {listing.get('external_id')} quick-rejected: price {price} > {self.price_max}")
+                    return False
+
+            # Pass quick filter - fetch detail page to check area
+            logger.debug(f"Listing {listing.get('external_id')} passed quick filter")
+            return True
+
+        # FULL FILTER (detailed=True): Check everything in full description
         # Check excluded keywords
         if self.keywords_excluded:
             if not self._text_excludes_all(combined_text, self.keywords_excluded):
@@ -60,7 +79,7 @@ class RealityFilter(BaseFilter):
                 logger.debug(f"Listing {listing.get('external_id')} rejected: price {price} > {self.price_max}")
                 return False
 
-        # Check area
+        # Check area (now from FULL description)
         area = self._extract_area(combined_text)
         if area is None:
             logger.debug(f"Listing {listing.get('external_id')} rejected: could not extract area")
