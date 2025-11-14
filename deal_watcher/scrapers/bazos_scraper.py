@@ -79,8 +79,8 @@ class BazosScraper(BaseScraper):
         listings = []
 
         # Find all listing containers
-        # Bazos uses <div class="inzeraty inzerat"> for each listing
-        listing_divs = soup.find_all('div', class_='inzerat')
+        # Bazos uses <div class="inzeraty"> for each listing
+        listing_divs = soup.find_all('div', class_='inzeraty')
 
         for listing_div in listing_divs:
             try:
@@ -105,7 +105,12 @@ class BazosScraper(BaseScraper):
         """
         try:
             # Find title and URL
-            title_link = listing_div.find('a', class_='nadpis')
+            # Title is in <h2 class="nadpis"><a href="...">Title</a></h2>
+            title_h2 = listing_div.find('h2', class_='nadpis')
+            if not title_h2:
+                return None
+
+            title_link = title_h2.find('a')
             if not title_link:
                 return None
 
@@ -134,9 +139,9 @@ class BazosScraper(BaseScraper):
 
             # Extract view count
             view_count = None
-            view_span = listing_div.find('span', string=re.compile(r'\d+\s*x'))
-            if view_span:
-                view_match = re.search(r'(\d+)\s*x', view_span.get_text())
+            view_div = listing_div.find('div', class_='inzeratyview')
+            if view_div:
+                view_match = re.search(r'(\d+)\s*x', view_div.get_text())
                 if view_match:
                     view_count = int(view_match.group(1))
 
