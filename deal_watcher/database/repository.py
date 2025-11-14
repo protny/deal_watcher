@@ -125,7 +125,7 @@ class DealRepository:
                     postal_code=listing_data.get('postal_code'),
                     url=listing_data.get('url'),
                     view_count=listing_data.get('view_count'),
-                    metadata=listing_data.get('metadata', {}),
+                    deal_metadata=listing_data.get('metadata', {}),
                     first_seen_at=datetime.utcnow(),
                     last_seen_at=datetime.utcnow(),
                     last_checked_at=datetime.utcnow(),
