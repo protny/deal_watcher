@@ -2,6 +2,36 @@
 
 ## ✅ Completed Improvements
 
+### 0. Critical Bug Fixes (Latest)
+
+**Problem:** Filter tests revealed 3 critical bugs causing missed listings and false positives.
+
+**Solutions:**
+
+1. **Slovak Accent Normalization** (`deal_watcher/filters/base_filter.py`)
+   - Added Unicode normalization to remove Slovak accents (á→a, č→c, é→e, etc.)
+   - Now "benzin" matches "benzín", "manual" matches "manuál"
+   - Fixed BMW filter missing listings due to accented keywords
+
+2. **Area Extraction Regex** (`deal_watcher/filters/reality_filter.py`)
+   - Changed greedy `.{0,60}` to non-greedy `.{0,60}?` to avoid consuming number digits
+   - Separated unit capture into dedicated group to prevent false matches
+   - Now correctly extracts: "5 hektárov" → 50,000 m², "45000 m²" → 45,000 m²
+   - Fixed issue where "45000 m²" was detected as hectares because "ha" appeared in "úžitková plocha"
+
+3. **Price-per-m² Rejection** (`deal_watcher/filters/reality_filter.py`)
+   - Added rejection of suspiciously low prices (< 100 EUR) as likely per-m² prices
+   - Controlled by `reject_price_per_m2: true` config (default)
+   - Prevents storing "65ha @ 3.5 EUR/m²" as 3.5 EUR total
+
+**Validation:**
+- Created `test_filters.py` with 12 comprehensive test cases
+- **All tests passing:** BMW 6/6 ✓, Reality 6/6 ✓
+
+**Impact:** Eliminates false negatives (missed deals) and false positives (incorrect matches).
+
+---
+
 ### 1. Comprehensive BMW Filters
 **Problem:** Missing many 6-cylinder manual BMWs because filtering only worked on "6 valec" keyword in truncated descriptions.
 
@@ -116,6 +146,34 @@ psql -d deal_watcher < database/reset_schema.sql
 ---
 
 ## 📊 Testing the System
+
+### Test 0: Validate Filters (Recommended First)
+
+**Before running the scraper, validate that filters work correctly:**
+
+```bash
+python3 test_filters.py
+```
+
+**Expected output:**
+```
+============================================================
+BMW Filter Results: 6 passed, 0 failed
+============================================================
+Reality Filter Results: 6 passed, 0 failed
+============================================================
+
+✓ All filter tests passed!
+```
+
+**What it tests:**
+- BMW filter: 6 test cases covering model codes, engine codes, transmission, fuel type
+- Reality filter: 6 test cases covering area extraction, unit conversion, price validation
+- Total: 12 comprehensive test cases
+
+**If tests fail:** Check filter configuration in `deal_watcher/config/config.json`
+
+---
 
 ### Test 1: Verify Scraping Works
 ```bash
