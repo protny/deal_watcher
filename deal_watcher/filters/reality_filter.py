@@ -27,6 +27,7 @@ class RealityFilter(BaseFilter):
         self.area_min = filter_config.get('area_min', 40000)  # Default 40000 m²
         self.area_units = filter_config.get('area_units', ['m2', 'm²', 'ha', 'hektár'])
         self.keywords_excluded = filter_config.get('keywords_excluded', [])
+        self.reject_price_per_m2 = filter_config.get('reject_price_per_m2', True)  # Default True
 
     def matches(self, listing: Dict[str, Any], detailed: bool = False) -> bool:
         """
@@ -71,6 +72,11 @@ class RealityFilter(BaseFilter):
         # Check price range
         price = listing.get('price')
         if price is not None:
+            # Reject suspiciously low prices (likely per-m² prices)
+            if self.reject_price_per_m2 and price < 100:
+                logger.debug(f"Listing {listing.get('external_id')} rejected: suspiciously low price {price} EUR (likely per-m²)")
+                return False
+
             if self.price_min is not None and price < self.price_min:
                 logger.debug(f"Listing {listing.get('external_id')} rejected: price too low")
                 return False
@@ -119,7 +125,10 @@ class RealityFilter(BaseFilter):
 
         # Comprehensive pattern for area with context (60 chars before and after)
         # This captures: "pozemok 5000 m2" or "úžitková plocha 120 m²"
-        pattern = r'(.{0,60})(\d+[\s,]*\d*)\s*(?:m2|m²|metrov\s*štvorcových|metrov|ha|hektár|hektárov|árov|arov|ár|a)(.{0,60})'
+        # Number pattern matches: "5", "50000", "50 000", "4.2", "4,5"
+        # Note: .{0,60}? is non-greedy to avoid consuming digits from the number
+        # Groups: (1) context before, (2) number, (3) unit, (4) context after
+        pattern = r'(.{0,60}?)(\d+(?:[\s,]\d+)*(?:[.,]\d+)?)\s*(m2|m²|metrov\s*štvorcových|metrov|ha|hektár|hektárov|árov|arov|ár|a)(.{0,60})'
 
         land_areas = []
         all_areas = []
@@ -127,20 +136,18 @@ class RealityFilter(BaseFilter):
         for match in re.finditer(pattern, normalized_text, re.IGNORECASE):
             try:
                 context_before = match.group(1).lower()
-                context_after = match.group(3).lower()
+                unit = match.group(3).lower()
+                context_after = match.group(4).lower()
                 context = context_before + ' ' + context_after
 
                 # Extract number
                 number_str = match.group(2).replace(' ', '').replace(',', '.')
                 value = float(number_str)
 
-                # Determine unit from matched text
-                full_match = match.group(0).lower()
-
-                # Convert to m²
-                if 'ha' in full_match or 'hektár' in full_match:
+                # Convert to m² based on unit
+                if 'ha' in unit or 'hektár' in unit:
                     area_m2 = value * 10000
-                elif 'ár' in full_match and 'hektár' not in full_match:
+                elif 'ár' in unit and 'hektár' not in unit:
                     area_m2 = value * 100
                 else:
                     area_m2 = value
