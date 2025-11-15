@@ -1,0 +1,40 @@
+{
+  "download_settings": {
+    "request_delay_seconds": 2.5,
+    "timeout_seconds": 30,
+    "max_retries": 3,
+    "retry_backoff_factor": 2,
+    "user_agents": [
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0"
+    ]
+  },
+  "urls_to_download": [
+    {
+      "name": "BMW Auto Listings",
+      "base_url": "https://auto.bazos.sk/bmw/",
+      "max_pages": 100,
+      "cache_subdir": "auto-bmw"
+    },
+    {
+      "name": "Land Plots",
+      "base_url": "https://reality.bazos.sk/predam/pozemok/",
+      "max_pages": 100,
+      "cache_subdir": "reality-pozemok"
+    },
+    {
+      "name": "Houses",
+      "base_url": "https://reality.bazos.sk/predam/dom/",
+      "max_pages": 100,
+      "cache_subdir": "reality-dom"
+    },
+    {
+      "name": "Cottages",
+      "base_url": "https://reality.bazos.sk/predam/chata/",
+      "max_pages": 100,
+      "cache_subdir": "reality-chata"
+    }
+  ]
+}
