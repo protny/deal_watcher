@@ -58,3 +58,4 @@ htmlcov/
 
 # Project specific
 deal_watcher/config/config.local.json
+.cache/
