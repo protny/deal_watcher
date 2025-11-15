@@ -16,16 +16,18 @@ logger = get_logger(__name__)
 class BaseScraper(ABC):
     """Abstract base class for all scrapers."""
 
-    def __init__(self, config: Dict[str, Any], http_client: HTTPClient):
+    def __init__(self, config: Dict[str, Any], http_client: HTTPClient, cache_manager=None):
         """
         Initialize base scraper.
 
         Args:
             config: Scraper configuration dictionary
             http_client: HTTP client instance
+            cache_manager: Optional CacheManager instance for listing storage
         """
         self.config = config
         self.http_client = http_client
+        self.cache_manager = cache_manager
         self.name = config.get('name', 'Unknown')
         self.url = config.get('url')
         self.max_pages = config.get('max_pages', 10)
@@ -34,6 +36,10 @@ class BaseScraper(ABC):
         self.days_back = config.get('days_back', 7)
         self.cache_pages = config.get('cache_pages', False)
         self.cache_dir = '.cache/pages'
+
+        # Source and category for cache manager
+        self.source = config.get('source', 'unknown')
+        self.category = config.get('category', 'unknown')
 
         # Create cache directory if needed
         if self.cache_pages and not os.path.exists(self.cache_dir):
@@ -125,6 +131,89 @@ class BaseScraper(ABC):
         except Exception as e:
             logger.error(f"Error fetching {url}: {e}")
             return None
+
+    def get_cached_listing(self, listing_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get cached listing data if available.
+
+        Args:
+            listing_id: Listing ID
+
+        Returns:
+            Cached listing data or None
+        """
+        if not self.cache_manager:
+            return None
+
+        cached = self.cache_manager.get_latest_listing(self.source, self.category, listing_id)
+        if cached:
+            logger.debug(f"Found cached listing {listing_id}")
+            return cached.get('data')
+        return None
+
+    def save_to_cache(self, listing_data: Dict[str, Any]) -> bool:
+        """
+        Save listing data to cache.
+
+        Args:
+            listing_data: Listing data dictionary
+
+        Returns:
+            True if saved successfully, False otherwise
+        """
+        if not self.cache_manager:
+            return False
+
+        listing_id = listing_data.get('external_id')
+        if not listing_id:
+            logger.warning("Cannot save to cache: no external_id")
+            return False
+
+        # Check if listing changed
+        if self.cache_manager.has_listing(self.source, self.category, listing_id):
+            change_info = self.cache_manager.detect_changes(
+                self.source, self.category, listing_id, listing_data
+            )
+            if change_info['changed']:
+                logger.info(f"Listing {listing_id} changed: {list(change_info['differences'].keys())}")
+        else:
+            logger.debug(f"New listing for cache: {listing_id}")
+
+        # Save to cache
+        result = self.cache_manager.save_listing(
+            self.source, self.category, listing_data
+        )
+        return result is not None
+
+    def fetch_or_get_from_cache(self, listing_url: str, listing_id: str, force_fetch: bool = False) -> Optional[Dict[str, Any]]:
+        """
+        Fetch listing detail page or retrieve from cache.
+
+        Args:
+            listing_url: URL to the listing detail page
+            listing_id: Listing ID
+            force_fetch: If True, always fetch from web (ignore cache)
+
+        Returns:
+            Complete listing data or None
+        """
+        # Try cache first if not forcing fetch
+        if not force_fetch:
+            cached_data = self.get_cached_listing(listing_id)
+            if cached_data:
+                logger.debug(f"Using cached data for listing {listing_id}")
+                return cached_data
+
+        # Fetch from web
+        logger.debug(f"Fetching listing {listing_id} from web")
+        detail_data = self.scrape_detail_page(listing_url)
+
+        if detail_data:
+            # Merge with any basic data we already have
+            # The detail data typically contains full description, images, etc.
+            return detail_data
+
+        return None
 
     def run(self) -> List[Dict[str, Any]]:
         """

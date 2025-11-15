@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from deal_watcher.utils.logger import setup_logger, get_logger
 from deal_watcher.utils.http_client import HTTPClient
 from deal_watcher.database.repository import DealRepository
+from deal_watcher.cache.cache_manager import CacheManager
 from deal_watcher.scrapers.auto_scraper import AutoScraper
 from deal_watcher.scrapers.reality_scraper import RealityScraper
 from deal_watcher.filters.auto_filter import AutoFilter
@@ -53,13 +54,14 @@ def load_config(config_path: str = 'deal_watcher/config/config.json') -> Dict[st
         sys.exit(1)
 
 
-def get_scraper(scraper_config: Dict[str, Any], http_client: HTTPClient):
+def get_scraper(scraper_config: Dict[str, Any], http_client: HTTPClient, cache_manager=None):
     """
     Factory function to create appropriate scraper based on type.
 
     Args:
         scraper_config: Scraper configuration
         http_client: HTTP client instance
+        cache_manager: Optional CacheManager instance
 
     Returns:
         Scraper instance
@@ -67,9 +69,9 @@ def get_scraper(scraper_config: Dict[str, Any], http_client: HTTPClient):
     scraper_type = scraper_config.get('type')
 
     if scraper_type == 'auto':
-        return AutoScraper(scraper_config, http_client)
+        return AutoScraper(scraper_config, http_client, cache_manager)
     elif scraper_type == 'reality':
-        return RealityScraper(scraper_config, http_client)
+        return RealityScraper(scraper_config, http_client, cache_manager)
     else:
         raise ValueError(f"Unknown scraper type: {scraper_type}")
 
@@ -98,7 +100,8 @@ def get_filter(scraper_config: Dict[str, Any]):
 def process_scraper(
     scraper_config: Dict[str, Any],
     http_client: HTTPClient,
-    repository: DealRepository
+    repository: DealRepository,
+    cache_manager=None
 ) -> Dict[str, int]:
     """
     Process a single scraper configuration.
@@ -107,6 +110,7 @@ def process_scraper(
         scraper_config: Scraper configuration
         http_client: HTTP client instance
         repository: Database repository
+        cache_manager: Optional CacheManager instance
 
     Returns:
         Dictionary with statistics
@@ -125,12 +129,13 @@ def process_scraper(
         'listings_processed': 0,
         'new_deals_found': 0,
         'price_changes_detected': 0,
-        'matches_found': 0
+        'matches_found': 0,
+        'cached_listings': 0
     }
 
     try:
         # Initialize scraper and filter
-        scraper = get_scraper(scraper_config, http_client)
+        scraper = get_scraper(scraper_config, http_client, cache_manager)
         listing_filter = get_filter(scraper_config)
 
         # Scrape listings
@@ -142,12 +147,18 @@ def process_scraper(
         # Process each listing
         for listing in listings:
             try:
+                external_id = listing.get('external_id')
+
+                # Save basic listing info to cache (all listings, not just matches)
+                if cache_manager:
+                    scraper.save_to_cache(listing)
+                    stats['cached_listings'] += 1
+
                 # Quick filter on list data
                 if not listing_filter.matches(listing, detailed=False):
                     continue
 
                 # Fetch detailed data if it passes quick filter
-                external_id = listing.get('external_id')
                 detail_url = listing.get('url')
 
                 logger.info(f"Fetching details for listing {external_id}")
@@ -156,6 +167,10 @@ def process_scraper(
                 if detail_data:
                     # Merge detail data into listing
                     listing.update(detail_data)
+
+                    # Save detailed listing to cache (creates new version if changed)
+                    if cache_manager:
+                        scraper.save_to_cache(listing)
 
                     # Apply detailed filter
                     if not listing_filter.matches(listing, detailed=True):
@@ -190,6 +205,7 @@ def process_scraper(
 
         logger.info(f"Scraper '{name}' completed:")
         logger.info(f"  - Listings processed: {stats['listings_processed']}")
+        logger.info(f"  - Cached to filesystem: {stats['cached_listings']}")
         logger.info(f"  - Matches found: {stats['matches_found']}")
         logger.info(f"  - New deals: {stats['new_deals_found']}")
         logger.info(f"  - Price changes: {stats['price_changes_detected']}")
@@ -232,6 +248,14 @@ def main():
         user_agents=scraping_config.get('user_agents', [])
     )
 
+    # Initialize cache manager
+    cache_config = config.get('cache', {})
+    cache_manager = None
+    if cache_config.get('enabled', True):
+        cache_dir = cache_config.get('cache_dir', 'cache')
+        cache_manager = CacheManager(cache_dir)
+        logger.info(f"Cache manager initialized at: {cache_dir}")
+
     # Initialize database repository
     db_connection = config['database']['connection_string']
     repository = DealRepository(db_connection)
@@ -248,7 +272,8 @@ def main():
         'listings_processed': 0,
         'new_deals_found': 0,
         'price_changes_detected': 0,
-        'matches_found': 0
+        'matches_found': 0,
+        'cached_listings': 0
     }
 
     scrapers = config.get('scrapers', [])
@@ -257,7 +282,7 @@ def main():
     logger.info(f"Found {len(enabled_scrapers)} enabled scrapers")
 
     for scraper_config in enabled_scrapers:
-        stats = process_scraper(scraper_config, http_client, repository)
+        stats = process_scraper(scraper_config, http_client, repository, cache_manager)
 
         # Accumulate stats
         for key in total_stats:
@@ -266,11 +291,22 @@ def main():
     # Clean up
     http_client.close()
 
+    # Print cache statistics
+    if cache_manager:
+        cache_stats = cache_manager.get_cache_stats()
+        logger.info("=" * 60)
+        logger.info("Cache Statistics:")
+        logger.info(f"  - Total cached listings: {cache_stats['total_listings']}")
+        logger.info(f"  - Total cache files: {cache_stats['total_files']}")
+        for source, source_data in cache_stats['sources'].items():
+            logger.info(f"  - {source}: {source_data['total_listings']} listings")
+
     # Print summary
     logger.info("=" * 60)
     logger.info("Deal Watcher - Complete")
     logger.info("=" * 60)
     logger.info(f"Total listings processed: {total_stats['listings_processed']}")
+    logger.info(f"Total cached to filesystem: {total_stats['cached_listings']}")
     logger.info(f"Total matches found: {total_stats['matches_found']}")
     logger.info(f"Total new deals: {total_stats['new_deals_found']}")
     logger.info(f"Total price changes: {total_stats['price_changes_detected']}")

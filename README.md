@@ -8,6 +8,8 @@ A modular system that tracks deals from online marketplaces. It periodically che
 - **Smart Filtering**: Configurable filters for specific criteria
 - **Price Tracking**: Monitors price changes over time
 - **PostgreSQL Storage**: Robust data storage with history tracking
+- **File System Cache**: All listings cached locally for offline analysis and filter development
+- **Change Detection**: Automatic versioning when listings are modified
 - **Automated Execution**: Designed for periodic execution via cron
 
 ## Current Implementations
@@ -129,7 +131,10 @@ deal_watcher/
 │   │   ├── models.py              # SQLAlchemy models
 │   │   ├── repository.py          # Database operations
 │   │   ├── schema.sql             # Database schema
-│   │   └── migrations/            # Future migrations
+│   │   └── migrations/            # Database migrations
+│   ├── cache/
+│   │   ├── cache_manager.py       # File system cache manager
+│   │   └── __init__.py
 │   ├── scrapers/
 │   │   ├── base_scraper.py        # Abstract base scraper
 │   │   ├── bazos_scraper.py       # Bazos.sk common logic
@@ -143,9 +148,14 @@ deal_watcher/
 │   │   ├── logger.py              # Logging utilities
 │   │   └── http_client.py         # HTTP client with retries
 │   └── main.py                    # Main CLI application
+├── cache/                         # File system cache (gitignored)
+│   └── bazos/                     # Organized by source
+│       ├── auto/                  # And category
+│       └── reality/
 ├── requirements.txt               # Python dependencies
 ├── .env.example                   # Environment variables template
 ├── README.md                      # This file
+├── CACHE_SYSTEM.md               # Cache system documentation
 └── DESIGN_DOCUMENT.md            # System design documentation
 ```
 
@@ -253,13 +263,44 @@ export PYTHONPATH="${PYTHONPATH}:$(pwd)"
 - Do not republish scraped content
 - Review robots.txt compliance
 
+## File System Cache
+
+All scraped listings are automatically cached to the file system, enabling:
+
+- **Offline Analysis**: Test filters without re-scraping
+- **Historical Tracking**: Multiple versions saved when content changes
+- **Fast Iteration**: Develop filters on cached data
+- **Data Persistence**: Keep records even after listings are removed
+
+See [CACHE_SYSTEM.md](CACHE_SYSTEM.md) for detailed documentation.
+
+### Cache Structure
+
+```
+cache/bazos/auto/184779117/
+├── 2025-11-15_143020.json    # Initial scrape
+└── 2025-11-16_091234.json    # After price change
+```
+
+### Cache Configuration
+
+```json
+{
+  "cache": {
+    "enabled": true,
+    "cache_dir": "cache",
+    "save_all_listings": true
+  }
+}
+```
+
 ## Future Enhancements
 
 - Email/Telegram notifications for new matches
 - Web dashboard for browsing deals
 - More sophisticated NLP filtering
 - Additional website modules
-- Image downloading and storage
+- Cache analytics and visualization
 - Deal similarity detection
 - Market analytics and trends
 
