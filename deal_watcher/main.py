@@ -148,20 +148,15 @@ def process_scraper(
         for listing in listings:
             try:
                 external_id = listing.get('external_id')
+                detail_url = listing.get('url')
 
-                # Save basic listing info to cache (all listings, not just matches)
+                # Save basic listing info to cache (all listings)
                 if cache_manager:
                     scraper.save_to_cache(listing)
                     stats['cached_listings'] += 1
 
-                # Quick filter on list data
-                if not listing_filter.matches(listing, detailed=False):
-                    continue
-
-                # Fetch detailed data if it passes quick filter
-                detail_url = listing.get('url')
-
-                logger.info(f"Fetching details for listing {external_id}")
+                # Fetch detailed data for ALL listings (no quick filter)
+                logger.debug(f"Fetching details for listing {external_id}")
                 detail_data = scraper.scrape_detail_page(detail_url)
 
                 if detail_data:
@@ -172,23 +167,21 @@ def process_scraper(
                     if cache_manager:
                         scraper.save_to_cache(listing)
 
-                    # Apply detailed filter
-                    if not listing_filter.matches(listing, detailed=True):
-                        continue
+                    # Apply filter on detailed data
+                    if listing_filter.matches(listing, detailed=True):
+                        # Listing matches! Save to database
+                        stats['matches_found'] += 1
+                        deal, is_new, price_changed = repository.create_or_update_deal(
+                            listing,
+                            category_id
+                        )
 
-                    # Listing matches! Save to database
-                    stats['matches_found'] += 1
-                    deal, is_new, price_changed = repository.create_or_update_deal(
-                        listing,
-                        category_id
-                    )
-
-                    if is_new:
-                        stats['new_deals_found'] += 1
-                        logger.info(f"✓ NEW: {listing.get('title')} - {listing.get('price')}€ (ID: {external_id})")
-                    elif price_changed:
-                        stats['price_changes_detected'] += 1
-                        logger.info(f"↓ PRICE CHANGE: {listing.get('title')} - {listing.get('price')}€ (ID: {external_id})")
+                        if is_new:
+                            stats['new_deals_found'] += 1
+                            logger.info(f"✓ NEW: {listing.get('title')} - {listing.get('price')}€ (ID: {external_id})")
+                        elif price_changed:
+                            stats['price_changes_detected'] += 1
+                            logger.info(f"↓ PRICE CHANGE: {listing.get('title')} - {listing.get('price')}€ (ID: {external_id})")
 
             except Exception as e:
                 logger.error(f"Error processing listing: {e}")
