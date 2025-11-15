@@ -16,13 +16,14 @@ class RealityScraper(BazosScraper):
     is identical across different Bazos.sk categories.
     """
 
-    def __init__(self, config: Dict[str, Any], http_client):
+    def __init__(self, config: Dict[str, Any], http_client, cache_manager=None):
         """
         Initialize reality scraper.
 
         Args:
             config: Scraper configuration
             http_client: HTTP client instance
+            cache_manager: Optional CacheManager instance
         """
-        super().__init__(config, http_client)
+        super().__init__(config, http_client, cache_manager)
         logger.info(f"Initialized RealityScraper for: {self.name}")

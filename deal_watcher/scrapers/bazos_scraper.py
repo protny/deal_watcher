@@ -16,9 +16,9 @@ class BazosScraper(BaseScraper):
 
     LISTINGS_PER_PAGE = 20
 
-    def __init__(self, config: Dict[str, Any], http_client):
+    def __init__(self, config: Dict[str, Any], http_client, cache_manager=None):
         """Initialize Bazos scraper."""
-        super().__init__(config, http_client)
+        super().__init__(config, http_client, cache_manager)
         self.base_url = self._extract_base_url(self.url)
 
     def _extract_base_url(self, url: str) -> str:
