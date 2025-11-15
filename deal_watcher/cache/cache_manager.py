@@ -13,6 +13,26 @@ from deal_watcher.utils.logger import get_logger
 logger = get_logger(__name__)
 
 
+def _convert_datetimes_to_str(data: Any) -> Any:
+    """
+    Recursively convert datetime objects to ISO format strings for JSON serialization.
+
+    Args:
+        data: Data to convert (can be dict, list, datetime, or any other type)
+
+    Returns:
+        Data with datetime objects converted to strings
+    """
+    if isinstance(data, datetime):
+        return data.isoformat()
+    elif isinstance(data, dict):
+        return {key: _convert_datetimes_to_str(value) for key, value in data.items()}
+    elif isinstance(data, list):
+        return [_convert_datetimes_to_str(item) for item in data]
+    else:
+        return data
+
+
 class CacheManager:
     """Manages file system cache for scraped listings."""
 
@@ -117,13 +137,16 @@ class CacheManager:
         filename = self._generate_filename(timestamp)
         filepath = listing_dir / filename
 
+        # Convert datetime objects to strings for JSON serialization
+        serializable_data = _convert_datetimes_to_str(listing_data)
+
         # Add metadata
         cache_data = {
             'cached_at': (timestamp or datetime.now()).isoformat(),
             'source': source,
             'category': category,
             'listing_id': listing_id,
-            'data': listing_data
+            'data': serializable_data
         }
 
         # Save to file
