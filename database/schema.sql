@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS deals (
     last_checked_at TIMESTAMP DEFAULT NOW(),
     is_active BOOLEAN DEFAULT true,
     view_count INTEGER,
-    metadata JSONB,  -- Flexible storage for category-specific data
+    extra_data JSONB,  -- Flexible storage for category-specific data
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS deals (
 CREATE INDEX IF NOT EXISTS idx_deals_external_id ON deals(external_id);
 CREATE INDEX IF NOT EXISTS idx_deals_category ON deals(category_id);
 CREATE INDEX IF NOT EXISTS idx_deals_active ON deals(is_active);
-CREATE INDEX IF NOT EXISTS idx_deals_metadata ON deals USING gin(metadata);
+CREATE INDEX IF NOT EXISTS idx_deals_extra_data ON deals USING gin(extra_data);
 CREATE INDEX IF NOT EXISTS idx_deals_first_seen ON deals(first_seen_at);
 
 -- Price history table: tracks price changes over time

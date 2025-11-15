@@ -49,7 +49,7 @@ class Deal(Base):
     last_checked_at = Column(TIMESTAMP, default=datetime.utcnow)
     is_active = Column(Boolean, default=True)
     view_count = Column(Integer)
-    deal_metadata = Column(JSONB)  # Flexible storage for category-specific data
+    extra_data = Column(JSONB)  # Flexible storage for category-specific data
     created_at = Column(TIMESTAMP, default=datetime.utcnow)
     updated_at = Column(TIMESTAMP, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -63,7 +63,7 @@ class Deal(Base):
         Index('idx_deals_external_id', 'external_id'),
         Index('idx_deals_category', 'category_id'),
         Index('idx_deals_active', 'is_active'),
-        Index('idx_deals_metadata', 'deal_metadata', postgresql_using='gin'),
+        Index('idx_deals_extra_data', 'extra_data', postgresql_using='gin'),
         Index('idx_deals_first_seen', 'first_seen_at'),
     )
 

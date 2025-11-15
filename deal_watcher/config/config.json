@@ -6,12 +6,24 @@
       "category_id": 1,
       "url": "https://auto.bazos.sk/bmw/",
       "type": "auto",
-      "max_pages": 10,
+      "mode": "new",
+      "max_pages": 100,
+      "days_back": 7,
+      "cache_pages": true,
       "filters": {
-        "keywords_any": ["E36", "E46", "E39"],
+        "keywords_any": [
+          "E36", "E46", "E39",
+          "320i", "323i", "325i", "328i", "330i",
+          "520i", "523i", "525i", "528i", "530i"
+        ],
         "keywords_all": ["benzin", "manuál"],
-        "keywords_engine": ["6 valec", "6-valec", "6 cylinder", "šesťvalec"],
-        "keywords_excluded": ["havarovan", "automat", "automatická"],
+        "keywords_engine": [
+          "6 valec", "6-valec", "6 cylinder", "šesťvalec",
+          "M50", "M52", "M54",
+          "M50B20", "M50B25", "M52B25", "M52B28", "M52TU",
+          "M54B22", "M54B25", "M54B30"
+        ],
+        "keywords_excluded": ["havarovan", "automat", "automatická", "automatic"],
         "price_max": null,
         "price_min": null
       }
@@ -22,12 +34,17 @@
       "category_id": 2,
       "url": "https://reality.bazos.sk/predam/pozemok/",
       "type": "reality",
-      "max_pages": 20,
+      "mode": "new",
+      "max_pages": 100,
+      "days_back": 7,
+      "cache_pages": true,
       "filters": {
         "price_max": 400000,
         "area_min": 40000,
+        "area_type": "land",
         "area_units": ["m2", "m²", "metrov", "hektár", "ha"],
-        "keywords_excluded": ["stavebný pozemok", "stavebny pozemok"]
+        "keywords_excluded": ["stavebný pozemok", "stavebny pozemok"],
+        "reject_price_per_m2": true
       }
     },
     {
@@ -36,12 +53,17 @@
       "category_id": 3,
       "url": "https://reality.bazos.sk/predam/dom/",
       "type": "reality",
-      "max_pages": 20,
+      "mode": "new",
+      "max_pages": 100,
+      "days_back": 7,
+      "cache_pages": true,
       "filters": {
         "price_max": 400000,
         "area_min": 40000,
+        "area_type": "land",
         "area_units": ["m2", "m²", "metrov", "hektár", "ha"],
-        "keywords_excluded": []
+        "keywords_excluded": [],
+        "reject_price_per_m2": true
       }
     },
     {
@@ -50,12 +72,17 @@
       "category_id": 4,
       "url": "https://reality.bazos.sk/predam/chata/",
       "type": "reality",
-      "max_pages": 20,
+      "mode": "new",
+      "max_pages": 100,
+      "days_back": 7,
+      "cache_pages": true,
       "filters": {
         "price_max": 400000,
         "area_min": 40000,
+        "area_type": "land",
         "area_units": ["m2", "m²", "metrov", "hektár", "ha"],
-        "keywords_excluded": []
+        "keywords_excluded": [],
+        "reject_price_per_m2": true
       }
     }
   ],

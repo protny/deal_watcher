@@ -1,5 +1,6 @@
 """Base filter abstract class."""
 
+import unicodedata
 from abc import ABC, abstractmethod
 from typing import Dict, Any
 
@@ -36,7 +37,10 @@ class BaseFilter(ABC):
 
     def _normalize_text(self, text: str) -> str:
         """
-        Normalize text for comparison (lowercase, remove extra whitespace).
+        Normalize text for comparison (lowercase, remove accents, remove extra whitespace).
+
+        This is important for Slovak text which uses accented characters like:
+        á, č, ď, é, í, ĺ, ľ, ň, ó, ô, ŕ, š, ť, ú, ý, ž
 
         Args:
             text: Text to normalize
@@ -46,7 +50,12 @@ class BaseFilter(ABC):
         """
         if not text:
             return ''
-        return ' '.join(text.lower().strip().split())
+        # Decompose unicode characters (é -> e + ́), then remove combining characters
+        normalized = unicodedata.normalize('NFD', text)
+        # Remove combining characters (accents)
+        without_accents = ''.join(char for char in normalized if unicodedata.category(char) != 'Mn')
+        # Lowercase and remove extra whitespace
+        return ' '.join(without_accents.lower().strip().split())
 
     def _text_contains_any(self, text: str, keywords: list) -> bool:
         """
