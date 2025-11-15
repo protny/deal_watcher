@@ -238,21 +238,16 @@ class BazosScraper(BaseScraper):
 
         return location_text.strip(), None
 
-    def scrape_detail_page(self, listing_url: str) -> Optional[Dict[str, Any]]:
+    def _parse_detail_page_from_soup(self, soup) -> Optional[Dict[str, Any]]:
         """
-        Scrape detail page for a listing.
+        Parse detail page from BeautifulSoup object.
 
         Args:
-            listing_url: Full URL to listing detail page
+            soup: BeautifulSoup object of detail page
 
         Returns:
             Dictionary with detailed information or None
         """
-        soup = self.fetch_page(listing_url)
-
-        if not soup:
-            return None
-
         try:
             # Extract full description
             description_div = soup.find('div', class_='popisdetail')
@@ -268,7 +263,7 @@ class BazosScraper(BaseScraper):
                     images.append(img_url)
 
             # Extract metadata (posted date, contact info, etc.)
-            metadata = {}
+            extra_data = {}
 
             # Try to find date posted
             date_pattern = re.compile(r'\[(\d{2}\.\d{2}\.\s*\d{4})\]')
@@ -276,16 +271,33 @@ class BazosScraper(BaseScraper):
             if date_match:
                 date_str = date_pattern.search(str(date_match)).group(1)
                 try:
-                    metadata['posted_date'] = datetime.strptime(date_str.strip(), '%d.%m. %Y').isoformat()
+                    extra_data['posted_date'] = datetime.strptime(date_str.strip(), '%d.%m. %Y').isoformat()
                 except ValueError:
                     pass
 
             return {
                 'description': description,
                 'images': images,
-                'metadata': metadata
+                'extra_data': extra_data
             }
 
         except Exception as e:
-            logger.error(f"Error scraping detail page {listing_url}: {e}")
+            logger.error(f"Error parsing detail page: {e}")
             return None
+
+    def scrape_detail_page(self, listing_url: str) -> Optional[Dict[str, Any]]:
+        """
+        Scrape detail page for a listing.
+
+        Args:
+            listing_url: Full URL to listing detail page
+
+        Returns:
+            Dictionary with detailed information or None
+        """
+        soup = self.fetch_page(listing_url)
+
+        if not soup:
+            return None
+
+        return self._parse_detail_page_from_soup(soup)

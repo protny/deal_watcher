@@ -88,73 +88,88 @@ def get_cache_directory_for_scraper(scraper_config: Dict[str, Any]) -> Path:
         return None
 
 
-def read_cached_pages(cache_dir: Path) -> List[BeautifulSoup]:
+def read_cached_listings(cache_dir: Path) -> List[tuple]:
     """
-    Read all cached HTML pages from a directory.
+    Read all cached individual listing HTML files from a directory.
 
     Args:
-        cache_dir: Directory containing cached HTML files
+        cache_dir: Directory containing cached listing HTML files
 
     Returns:
-        List of BeautifulSoup objects
+        List of tuples (listing_id, BeautifulSoup, metadata)
     """
     if not cache_dir.exists():
         logger.warning(f"Cache directory does not exist: {cache_dir}")
         return []
 
-    pages = []
-    html_files = sorted(cache_dir.glob('page_*.html'))
+    listings = []
+    html_files = list(cache_dir.glob('*.html'))
 
-    logger.info(f"Found {len(html_files)} cached pages in {cache_dir}")
+    logger.info(f"Found {len(html_files)} cached listings in {cache_dir}")
 
     for html_file in html_files:
         try:
+            listing_id = html_file.stem
+
+            # Read HTML
             with open(html_file, 'r', encoding='utf-8') as f:
                 content = f.read()
                 soup = BeautifulSoup(content, 'lxml')
-                pages.append(soup)
+
+            # Read metadata if exists
+            meta_file = html_file.parent / f"{listing_id}.meta.json"
+            metadata = {}
+            if meta_file.exists():
+                with open(meta_file, 'r', encoding='utf-8') as f:
+                    metadata = json.load(f)
+
+            listings.append((listing_id, soup, metadata))
+
         except Exception as e:
             logger.error(f"Error reading {html_file}: {e}")
 
-    return pages
+    return listings
 
 
-def extract_listings_from_pages(
-    pages: List[BeautifulSoup],
+def parse_listing_from_html(
+    listing_id: str,
+    soup: BeautifulSoup,
+    metadata: Dict[str, Any],
     scraper: BazosScraper
-) -> List[Dict[str, Any]]:
+) -> Optional[Dict[str, Any]]:
     """
-    Extract all listings from cached pages using scraper's parsing logic.
+    Parse a listing from its cached HTML detail page.
 
     Args:
-        pages: List of BeautifulSoup objects
+        listing_id: Listing ID
+        soup: BeautifulSoup of listing detail page
+        metadata: Metadata about the cached file
         scraper: Scraper instance to use for parsing
 
     Returns:
-        List of listing dictionaries
+        Parsed listing dictionary or None
     """
-    all_listings = []
+    try:
+        # Use scraper's detail page parsing logic
+        detail_data = scraper._parse_detail_page_from_soup(soup)
 
-    for page_num, soup in enumerate(pages):
-        try:
-            # Find all listing containers
-            listing_divs = soup.find_all('div', class_='inzeraty')
-            logger.debug(f"Page {page_num + 1}: found {len(listing_divs)} listings")
+        if not detail_data:
+            return None
 
-            for listing_div in listing_divs:
-                try:
-                    listing_data = scraper._parse_list_item(listing_div)
-                    if listing_data:
-                        all_listings.append(listing_data)
-                except Exception as e:
-                    logger.warning(f"Error parsing listing: {e}")
-                    continue
+        # Build complete listing data
+        listing = {
+            'external_id': listing_id,
+            'url': metadata.get('url', ''),
+        }
 
-        except Exception as e:
-            logger.error(f"Error processing page {page_num + 1}: {e}")
+        # Merge in the parsed detail data
+        listing.update(detail_data)
 
-    logger.info(f"Extracted {len(all_listings)} total listings from cached pages")
-    return all_listings
+        return listing
+
+    except Exception as e:
+        logger.error(f"Error parsing listing {listing_id}: {e}")
+        return None
 
 
 def get_scraper(scraper_config: Dict[str, Any], http_client: HTTPClient):
@@ -244,54 +259,48 @@ def process_scraper_from_cache(
     }
 
     try:
-        # Read cached HTML pages
-        pages = read_cached_pages(cache_dir)
-        if not pages:
-            logger.warning(f"No cached pages found for {name}")
+        # Read cached listing HTML files
+        cached_listings = read_cached_listings(cache_dir)
+        if not cached_listings:
+            logger.warning(f"No cached listings found for {name}")
             return stats
 
         # Create scraper and filter
         scraper = get_scraper(scraper_config, http_client)
         listing_filter = get_filter(scraper_config)
 
-        # Extract listings from cached pages
-        listings = extract_listings_from_pages(pages, scraper)
-        stats['listings_processed'] = len(listings)
+        stats['listings_processed'] = len(cached_listings)
+        logger.info(f"Processing {len(cached_listings)} cached listings...")
 
-        logger.info(f"Processing {len(listings)} listings...")
-
-        # Process each listing
-        for listing in listings:
+        # Process each cached listing
+        for listing_id, soup, metadata in cached_listings:
             try:
-                external_id = listing.get('external_id')
-                detail_url = listing.get('url')
+                # Parse listing from cached HTML
+                logger.debug(f"Parsing cached listing {listing_id}")
+                listing = parse_listing_from_html(listing_id, soup, metadata, scraper)
 
-                # Fetch detailed data (still need to fetch detail pages live)
-                logger.debug(f"Fetching details for listing {external_id}")
-                detail_data = scraper.scrape_detail_page(detail_url)
+                if not listing:
+                    logger.warning(f"Could not parse listing {listing_id}")
+                    continue
 
-                if detail_data:
-                    # Merge detail data into listing
-                    listing.update(detail_data)
+                # Apply filter on parsed data
+                if listing_filter.matches(listing, detailed=True):
+                    # Listing matches! Save to database
+                    stats['matches_found'] += 1
+                    deal, is_new, price_changed = repository.create_or_update_deal(
+                        listing,
+                        category_id
+                    )
 
-                    # Apply filter on detailed data
-                    if listing_filter.matches(listing, detailed=True):
-                        # Listing matches! Save to database
-                        stats['matches_found'] += 1
-                        deal, is_new, price_changed = repository.create_or_update_deal(
-                            listing,
-                            category_id
-                        )
-
-                        if is_new:
-                            stats['new_deals_found'] += 1
-                            logger.info(f"✓ NEW: {listing.get('title')} - {listing.get('price')}€ (ID: {external_id})")
-                        elif price_changed:
-                            stats['price_changes_detected'] += 1
-                            logger.info(f"↓ PRICE CHANGE: {listing.get('title')} - {listing.get('price')}€ (ID: {external_id})")
+                    if is_new:
+                        stats['new_deals_found'] += 1
+                        logger.info(f"✓ NEW: {listing.get('title')} - {listing.get('price')}€ (ID: {listing_id})")
+                    elif price_changed:
+                        stats['price_changes_detected'] += 1
+                        logger.info(f"↓ PRICE CHANGE: {listing.get('title')} - {listing.get('price')}€ (ID: {listing_id})")
 
             except Exception as e:
-                logger.error(f"Error processing listing: {e}")
+                logger.error(f"Error processing listing {listing_id}: {e}")
                 continue
 
         # Update scraping run

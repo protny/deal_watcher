@@ -1,17 +1,21 @@
 """
-Downloader script - fetches and caches HTML pages from configured URLs.
+Downloader script - fetches and caches individual listing HTML pages.
 
-This script only downloads and stores raw HTML pages. No filtering or processing.
-Run this periodically to build/update your local cache of listings.
+This script:
+1. Fetches list pages (not cached)
+2. Extracts individual listing URLs
+3. Downloads and caches each listing's detail page as separate HTML file
 """
 
 import os
 import sys
 import json
-import hashlib
+import re
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Set
+from urllib.parse import urljoin
+from bs4 import BeautifulSoup
 
 from deal_watcher.utils.logger import setup_logger, get_logger
 from deal_watcher.utils.http_client import HTTPClient
@@ -59,26 +63,80 @@ def get_page_url(base_url: str, page_number: int) -> str:
     return f"{base_url}/{offset}/"
 
 
-def save_page_to_cache(
+def extract_base_url(url: str) -> str:
+    """Extract base URL from full URL."""
+    match = re.match(r'(https?://[^/]+)', url)
+    return match.group(1) if match else url
+
+
+def extract_listing_urls_from_page(html_content: bytes, base_url: str) -> List[Dict[str, str]]:
+    """
+    Extract listing URLs from a list page.
+
+    Args:
+        html_content: Raw HTML content
+        base_url: Base URL for resolving relative links
+
+    Returns:
+        List of dicts with listing_id and url
+    """
+    soup = BeautifulSoup(html_content, 'lxml')
+    listings = []
+
+    # Find all listing containers
+    listing_divs = soup.find_all('div', class_='inzeraty')
+
+    for listing_div in listing_divs:
+        try:
+            # Find title and URL
+            title_h2 = listing_div.find('h2', class_='nadpis')
+            if not title_h2:
+                continue
+
+            title_link = title_h2.find('a')
+            if not title_link:
+                continue
+
+            relative_url = title_link.get('href', '')
+            full_url = urljoin(base_url, relative_url)
+
+            # Extract listing ID from URL
+            # Pattern: /inzerat/123456789/title
+            match = re.search(r'/inzerat/(\d+)/', full_url)
+            if match:
+                listing_id = match.group(1)
+                listings.append({
+                    'listing_id': listing_id,
+                    'url': full_url
+                })
+
+        except Exception as e:
+            logger.warning(f"Error parsing listing: {e}")
+            continue
+
+    return listings
+
+
+def save_listing_to_cache(
     cache_dir: Path,
+    listing_id: str,
     url: str,
-    content: bytes,
-    page_number: int
+    content: bytes
 ) -> Path:
     """
-    Save HTML page to cache directory.
+    Save individual listing HTML to cache directory.
 
     Args:
         cache_dir: Cache directory for this URL category
+        listing_id: Listing ID
         url: URL that was fetched
         content: Raw HTML content
-        page_number: Page number
 
     Returns:
         Path to saved file
     """
-    # Create filename: page_0001.html, page_0002.html, etc.
-    filename = f"page_{page_number:04d}.html"
+    # Create filename: {listing_id}.html
+    filename = f"{listing_id}.html"
     filepath = cache_dir / filename
 
     # Save HTML
@@ -86,11 +144,11 @@ def save_page_to_cache(
         f.write(content)
 
     # Save metadata
-    meta_filename = f"page_{page_number:04d}.meta.json"
+    meta_filename = f"{listing_id}.meta.json"
     meta_filepath = cache_dir / meta_filename
     metadata = {
+        'listing_id': listing_id,
         'url': url,
-        'page_number': page_number,
         'downloaded_at': datetime.now().isoformat(),
         'content_length': len(content)
     }
@@ -106,7 +164,7 @@ def download_url_category(
     base_cache_dir: Path
 ) -> Dict[str, int]:
     """
-    Download all pages for a single URL category.
+    Download all individual listings for a URL category.
 
     Args:
         url_config: URL configuration (name, base_url, max_pages, cache_subdir)
@@ -132,50 +190,100 @@ def download_url_category(
     cache_dir.mkdir(parents=True, exist_ok=True)
     logger.info(f"Cache directory: {cache_dir}")
 
+    # Get already cached listing IDs (to avoid re-downloading)
+    cached_ids = set()
+    for html_file in cache_dir.glob('*.html'):
+        listing_id = html_file.stem
+        cached_ids.add(listing_id)
+
+    logger.info(f"Found {len(cached_ids)} already cached listings")
+
     stats = {
-        'pages_downloaded': 0,
-        'pages_failed': 0,
+        'list_pages_fetched': 0,
+        'listings_found': 0,
+        'listings_downloaded': 0,
+        'listings_skipped': 0,
+        'listings_failed': 0,
         'total_bytes': 0
     }
 
-    # Download each page
+    base_domain = extract_base_url(base_url)
+    all_listing_urls = []
+
+    # Step 1: Fetch list pages and extract listing URLs
+    logger.info("Step 1: Extracting listing URLs from list pages...")
     for page_num in range(max_pages):
         url = get_page_url(base_url, page_num)
-        logger.info(f"Downloading page {page_num + 1}/{max_pages}: {url}")
+        logger.info(f"Fetching list page {page_num + 1}/{max_pages}")
 
         try:
             response = http_client.get(url)
             if response and response.status_code == 200:
                 content = response.content
+                stats['list_pages_fetched'] += 1
 
-                # Check if page is empty or has no listings
-                if len(content) < 1000:
-                    logger.warning(f"Page {page_num + 1} seems empty, stopping")
+                # Extract listing URLs
+                listings = extract_listing_urls_from_page(content, base_domain)
+                logger.info(f"  Found {len(listings)} listings on page {page_num + 1}")
+
+                all_listing_urls.extend(listings)
+
+                if len(listings) == 0:
+                    logger.warning(f"No listings on page {page_num + 1}, stopping")
                     break
 
-                # Save to cache
-                filepath = save_page_to_cache(cache_dir, url, content, page_num)
-                stats['pages_downloaded'] += 1
-                stats['total_bytes'] += len(content)
-
-                logger.info(f"  ✓ Saved to {filepath} ({len(content):,} bytes)")
-
             else:
-                logger.error(f"  ✗ Failed to download page {page_num + 1}")
-                stats['pages_failed'] += 1
-
-                # If we fail on page 0, something is wrong - stop
+                logger.error(f"  Failed to fetch page {page_num + 1}")
                 if page_num == 0:
                     logger.error("Failed on first page, stopping this category")
                     break
 
         except Exception as e:
-            logger.error(f"Error downloading page {page_num + 1}: {e}")
-            stats['pages_failed'] += 1
+            logger.error(f"Error fetching page {page_num + 1}: {e}")
+
+    stats['listings_found'] = len(all_listing_urls)
+    logger.info(f"\nFound {len(all_listing_urls)} total listings")
+
+    # Step 2: Download individual listing pages
+    logger.info("\nStep 2: Downloading individual listing pages...")
+    for idx, listing_info in enumerate(all_listing_urls, 1):
+        listing_id = listing_info['listing_id']
+        listing_url = listing_info['url']
+
+        # Skip if already cached
+        if listing_id in cached_ids:
+            stats['listings_skipped'] += 1
+            logger.debug(f"[{idx}/{len(all_listing_urls)}] Skipping cached: {listing_id}")
+            continue
+
+        logger.info(f"[{idx}/{len(all_listing_urls)}] Downloading: {listing_id}")
+
+        try:
+            response = http_client.get(listing_url)
+            if response and response.status_code == 200:
+                content = response.content
+
+                # Save to cache
+                filepath = save_listing_to_cache(cache_dir, listing_id, listing_url, content)
+                stats['listings_downloaded'] += 1
+                stats['total_bytes'] += len(content)
+
+                logger.info(f"  ✓ Saved {listing_id} ({len(content):,} bytes)")
+
+            else:
+                logger.error(f"  ✗ Failed to download {listing_id}")
+                stats['listings_failed'] += 1
+
+        except Exception as e:
+            logger.error(f"Error downloading {listing_id}: {e}")
+            stats['listings_failed'] += 1
 
     logger.info(f"\n{name} completed:")
-    logger.info(f"  - Pages downloaded: {stats['pages_downloaded']}")
-    logger.info(f"  - Pages failed: {stats['pages_failed']}")
+    logger.info(f"  - List pages fetched: {stats['list_pages_fetched']}")
+    logger.info(f"  - Listings found: {stats['listings_found']}")
+    logger.info(f"  - Listings downloaded: {stats['listings_downloaded']}")
+    logger.info(f"  - Listings skipped (cached): {stats['listings_skipped']}")
+    logger.info(f"  - Listings failed: {stats['listings_failed']}")
     logger.info(f"  - Total size: {stats['total_bytes'] / 1024 / 1024:.2f} MB")
 
     return stats
@@ -211,8 +319,11 @@ def main():
 
     # Process each URL category
     total_stats = {
-        'pages_downloaded': 0,
-        'pages_failed': 0,
+        'list_pages_fetched': 0,
+        'listings_found': 0,
+        'listings_downloaded': 0,
+        'listings_skipped': 0,
+        'listings_failed': 0,
         'total_bytes': 0
     }
 
@@ -233,8 +344,11 @@ def main():
     logger.info("\n" + "=" * 60)
     logger.info("Download Complete")
     logger.info("=" * 60)
-    logger.info(f"Total pages downloaded: {total_stats['pages_downloaded']}")
-    logger.info(f"Total pages failed: {total_stats['pages_failed']}")
+    logger.info(f"Total list pages fetched: {total_stats['list_pages_fetched']}")
+    logger.info(f"Total listings found: {total_stats['listings_found']}")
+    logger.info(f"Total listings downloaded: {total_stats['listings_downloaded']}")
+    logger.info(f"Total listings skipped (cached): {total_stats['listings_skipped']}")
+    logger.info(f"Total listings failed: {total_stats['listings_failed']}")
     logger.info(f"Total size: {total_stats['total_bytes'] / 1024 / 1024:.2f} MB")
     logger.info(f"Cache location: {base_cache_dir.absolute()}")
     logger.info("=" * 60)
