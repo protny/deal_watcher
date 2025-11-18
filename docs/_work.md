@@ -366,8 +366,7 @@ Environment variables:
 - **Architecture**: `docs/architecture/design_document.md`
 - **Cache System**: `docs/architecture/cache_system.md`
 - **Workflow**: `docs/architecture/workflow.md`
-- **Setup Guide**: `docs/setup/setup_guide.md`
-- **Implementation Details**: `docs/development/implementation_summary.md`
+- **Setup & Operations**: `docs/setup/setup_guide.md`
 - **Quick Reference**: `docs/_quick_summary.md`
 
 ---

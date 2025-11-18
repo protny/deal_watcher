@@ -307,22 +307,6 @@ Two-stage workflow documentation (downloader + processor).
 
 ### `docs/development/`
 
-#### `implementation_summary.md`
-Detailed summary of completed features and improvements.
-
-**Contents**:
-- Bug fixes (accent normalization, area extraction, price validation)
-- Performance optimizations
-- Filter enhancements
-- Testing and validation
-- Database migration
-- Performance metrics
-- Troubleshooting
-
-**Audience**: Developers, understanding what was implemented
-
----
-
 #### `original_requirements.md`
 Original project requirements and specification.
 
@@ -474,7 +458,6 @@ deal_watcher/
 │   │   ├── cache_system.md        # Cache system docs
 │   │   └── workflow.md            # Two-stage workflow
 │   └── development/
-│       ├── implementation_summary.md  # Completed features
 │       └── original_requirements.md   # Original project spec
 │
 ├── database/
@@ -503,9 +486,9 @@ deal_watcher/
 ## Need Help?
 
 1. **Getting Started**: Read `README.md` in project root
-2. **Setup Issues**: Check `docs/setup/setup_guide.md`
+2. **Setup & Operations**: Check `docs/setup/setup_guide.md`
 3. **Understanding Architecture**: Read `docs/architecture/design_document.md`
-4. **Filter Problems**: Read `docs/development/implementation_summary.md`
+4. **Testing & Troubleshooting**: See `docs/setup/setup_guide.md` Operations section
 5. **Planning Next Steps**: Read `docs/_work.md`
 6. **Quick Lookup**: This file (`docs/_quick_summary.md`)
 
