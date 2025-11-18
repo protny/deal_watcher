@@ -1,19 +1,15 @@
-a modular system that tracks deals that can be found on internet if they fullfill certain criteria, it periodically checks if new deals were added and checks if there were changes like decreased price in the existing deals
-data is obtained by scraping websites, there will be several modules, each able to deal with the format of specific website, for start we will only be using bazos.sk and namely in categories 
-https://auto.bazos.sk/bmw/ - we will be looking for BMW E36, E46, E39 with a 6 cylinder petrol engine and manual transmission (6 valec, benzin, manualna prevodovka)
+refresh from github main branch
+move all documentation to separate documents folder, if there are many documents conceerning separate areas divide them accordingly into subdirectories
+create additional documents 
+- one called _work.md summarizing what was done, what future development needs to be done and what you suggest as the next plan
+- another one called _quick_summary.md - containing concise description of executable scripts and how to use them and of the documents with a very concise description of their content
 
-and in 
-https://reality.bazos.sk/predam/pozemok/
-https://reality.bazos.sk/predam/dom/
-https://reality.bazos.sk/predam/chata/
-we will be looking for land, houses or cottages with a large plot of land of at least 4 hectares or 40000 square meters and price below 400000EUR
+make sure there is no unnecessary duplicate information in the documents and remove/edit old todos  or task documents that have already been implemented. if any documents logically should be joined such as 3 different todos - do so
 
-we will be storing deals fullfilling our criteria in a postgresql database and will track the date they were added and a history of price changes and dates when they disappear so we can judge how long it takes for these to sell
+go through code and ensure all is well documented inline
 
-configuration of parameters for search should be done via json file, this will be run in a console using cron periodically so no elaborate output is needed just some indication what is going on and if something new or a change was detected, 
-more human readable format will be done later in a consuming web application, this is just about getting and maintaining the data
+after you are done recheck if the project structure is readable and if all is where it should be - the aim is for the directory structure and files to be well organized allowing to resume work on this project even after a longer pause
 
-please research the format of data on the websites
-suggest mechanism for obtaining the data, how to store it, what the filtering system should be
+i dont want to see any documentation (other than README.md and CLAUDE.md) in the main or src folder 
 
-prepare concise document for review before creating a todo list
+temporary, miscelaneus, testing, migration scripts should be moved to a subfolder

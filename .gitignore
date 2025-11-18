@@ -60,3 +60,4 @@ htmlcov/
 deal_watcher/config/config.local.json
 .cache/
 /cache/
+cache/*
