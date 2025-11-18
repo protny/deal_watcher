@@ -152,11 +152,15 @@ deal_watcher/
 │   └── bazos/                     # Organized by source
 │       ├── auto/                  # And category
 │       └── reality/
+├── docs/                          # Documentation
+│   ├── setup/                     # Setup guides
+│   ├── architecture/              # Design and technical docs
+│   ├── development/               # Development notes
+│   ├── _work.md                   # Work summary & future plans
+│   └── _quick_summary.md          # Quick reference guide
 ├── requirements.txt               # Python dependencies
 ├── .env.example                   # Environment variables template
-├── README.md                      # This file
-├── CACHE_SYSTEM.md               # Cache system documentation
-└── DESIGN_DOCUMENT.md            # System design documentation
+└── README.md                      # This file
 ```
 
 ## Database Schema
@@ -272,7 +276,7 @@ All scraped listings are automatically cached to the file system, enabling:
 - **Fast Iteration**: Develop filters on cached data
 - **Data Persistence**: Keep records even after listings are removed
 
-See [CACHE_SYSTEM.md](CACHE_SYSTEM.md) for detailed documentation.
+See [docs/architecture/cache_system.md](docs/architecture/cache_system.md) for detailed documentation.
 
 ### Cache Structure
 
@@ -310,4 +314,8 @@ This project is for educational and personal use only.
 
 ## Support
 
-For issues, questions, or contributions, please refer to the project documentation in `DESIGN_DOCUMENT.md`.
+For issues, questions, or contributions, please refer to the project documentation:
+- **Quick Reference**: `docs/_quick_summary.md`
+- **Work Summary**: `docs/_work.md`
+- **Architecture**: `docs/architecture/design_document.md`
+- **Setup Guide**: `docs/setup/setup_guide.md`
